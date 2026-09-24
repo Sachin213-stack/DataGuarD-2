@@ -44,18 +44,18 @@ npx @vscode/vsce package
 
 **For VS Code:**
 ```bash
-code --install-extension dataguard-ai-0.1.0.vsix
+code --install-extension dataguard-ai-0.1.1.vsix
 ```
 
 **For Antigravity:**
 ```bash
-antigravity --install-extension dataguard-ai-0.1.0.vsix
+antigravity --install-extension dataguard-ai-0.1.1.vsix
 ```
 
 **Or install manually via UI:**
 1. Open VS Code / Antigravity
 2. Press `Ctrl+Shift+P` → type **"Install from VSIX"**
-3. Select the `dataguard-ai-0.1.0.vsix` file
+3. Select the `dataguard-ai-0.1.1.vsix` file
 4. Reload the editor when prompted
 
 ### Development Mode
