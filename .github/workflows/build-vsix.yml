@@ -1,0 +1,76 @@
+name: Build & Package DataGuard VSIX
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-package:
+    name: Build & Package Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r sidecar/requirements.txt pytest
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run Jest tests
+        run: npm test
+
+      - name: Run Python tests
+        run: python -m pytest sidecar/tests/ -v
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Find VSIX file
+        id: get_vsix
+        run: |
+          VSIX_FILE=$(ls *.vsix | head -n 1)
+          echo "vsix_file=$VSIX_FILE" >> $GITHUB_OUTPUT
+          echo "Found VSIX package: $VSIX_FILE"
+
+      - name: Upload VSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataguard-ai-vsix
+          path: ${{ steps.get_vsix.outputs.vsix_file }}
+          retention-days: 30
+
+      - name: Create GitHub Release (on Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.get_vsix.outputs.vsix_file }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -93,7 +93,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "jest",
-    "test:python": "python -m pytest sidecar/tests/ -v"
+    "test:python": "python -m pytest sidecar/tests/ -v",
+    "package": "npx @vscode/vsce package --no-dependencies"
   },
   "jest": {
     "preset": "ts-jest",
