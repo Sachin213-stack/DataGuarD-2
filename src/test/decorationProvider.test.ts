@@ -69,12 +69,20 @@ describe('DecorationProvider.applyDecorations', () => {
         expect(decorationOpts).toHaveLength(1);
     });
 
-    it('applies decorations when classImbalance is non-null', () => {
+    it('applies decorations when classImbalance is heavily imbalanced (>80%)', () => {
         const editor = makeEditor(["df = pd.read_csv('file.csv')"]);
         const result = makeResult({ classImbalance: { label: { yes: 90, no: 10 } } });
         DecorationProvider.applyDecorations(editor, result);
         const [, decorationOpts] = editor.setDecorations.mock.calls[0];
         expect(decorationOpts).toHaveLength(1);
+    });
+
+    it('does not apply decorations when classes are balanced (e.g. 50/50)', () => {
+        const editor = makeEditor(["df = pd.read_csv('file.csv')"]);
+        const result = makeResult({ classImbalance: { label: { yes: 50, no: 50 } } });
+        DecorationProvider.applyDecorations(editor, result);
+        const [, decorationOpts] = editor.setDecorations.mock.calls[0];
+        expect(decorationOpts).toHaveLength(0);
     });
 
     it('does not decorate lines that do not contain a data-load pattern', () => {

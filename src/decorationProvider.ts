@@ -12,11 +12,29 @@ const warningDecoration = vscode.window.createTextEditorDecorationType({
 });
 
 export class DecorationProvider {
+    static hasQualityIssues(result: AnalysisResult): boolean {
+        if (Object.keys(result.missingValues || {}).length > 0) {
+            return true;
+        }
+        if ((result.outlierColumns || []).length > 0) {
+            return true;
+        }
+        if (result.classImbalance) {
+            for (const counts of Object.values(result.classImbalance)) {
+                const values = Object.values(counts);
+                if (values.length === 0) { continue; }
+                const total = values.reduce((a, b) => a + b, 0);
+                if (total > 0 && Math.max(...values) / total > 0.8) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     static applyDecorations(editor: vscode.TextEditor | undefined, result: AnalysisResult) {
         if (!editor) { return; }
-        const hasIssues = Object.keys(result.missingValues).length > 0
-            || result.outlierColumns.length > 0
-            || result.classImbalance !== null;
+        const hasIssues = DecorationProvider.hasQualityIssues(result);
         if (!hasIssues) {
             editor.setDecorations(warningDecoration, []);
             return;

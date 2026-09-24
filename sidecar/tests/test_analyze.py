@@ -83,6 +83,14 @@ class TestDetectOutliersIqr:
         frac = detect_outliers_iqr(series)
         assert frac > 0.0
 
+    def test_empty_series_returns_zero(self):
+        series = pd.Series([], dtype=float)
+        assert detect_outliers_iqr(series) == 0.0
+
+    def test_all_nan_series_returns_zero(self):
+        series = pd.Series([float("nan"), float("nan")], dtype=float).dropna()
+        assert detect_outliers_iqr(series) == 0.0
+
 
 # ---------------------------------------------------------------------------
 # generate_rule_based_summary
@@ -148,12 +156,27 @@ class TestGenerateRuleBasedSummary:
         assert "col_a" in summary
         assert "col_b" in summary
 
+    def test_empty_imbalance_counts_does_not_crash(self):
+        result = self._make_result(classImbalance={"col_c": {}})
+        summary = generate_rule_based_summary(result)
+        assert len(summary) > 0
+
 
 # ---------------------------------------------------------------------------
 # analyze  (integration – writes real temporary files)
 # ---------------------------------------------------------------------------
 
 class TestAnalyze:
+    def test_analyze_all_nan_column_does_not_crash(self):
+        df = pd.DataFrame({"age": [float("nan"), float("nan")], "name": ["A", "B"]})
+        path = _write_csv(df)
+        try:
+            result = analyze(path)
+            assert result["shape"] == [2, 2]
+            assert "age" in result["missingValues"]
+        finally:
+            os.unlink(path)
+
     def test_analyze_csv_returns_correct_shape(self):
         df = pd.DataFrame({"a": range(50), "b": range(50)})
         path = _write_csv(df)

@@ -11,10 +11,12 @@ IMBALANCE_THRESHOLD = 0.8
 
 def detect_outliers_iqr(series: pd.Series) -> float:
     """Return fraction of outliers using IQR method."""
+    if len(series) == 0:
+        return 0.0
     Q1 = series.quantile(0.25)
     Q3 = series.quantile(0.75)
     IQR = Q3 - Q1
-    if IQR == 0:
+    if IQR == 0 or np.isnan(IQR):
         return 0.0
     outliers = ((series < Q1 - 1.5 * IQR) | (series > Q3 + 1.5 * IQR)).sum()
     return float(outliers) / len(series)
@@ -30,6 +32,8 @@ def generate_rule_based_summary(result: dict) -> str:
     if result['classImbalance']:
         for col, counts in result['classImbalance'].items():
             values = list(counts.values())
+            if not values:
+                continue
             if max(values) / (sum(values) + 1e-9) > IMBALANCE_THRESHOLD:  # epsilon guards against unexpected empty counts
                 lines.append(f"⚠ Column '{col}' is heavily imbalanced. Consider resampling techniques.")
     if not lines:
@@ -43,7 +47,7 @@ def generate_ai_summary(result: dict) -> str:
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         stats_text = json.dumps({
             'shape': result['shape'],
             'missingPercent': result['missingPercent'],
@@ -72,7 +76,7 @@ def analyze(file_path: str) -> dict:
 
     missing = df.isnull().sum()
     missing_values = {col: int(cnt) for col, cnt in missing.items() if cnt > 0}
-    missing_percent = {col: round(float(cnt) / len(df) * 100, 2) for col, cnt in missing.items() if cnt > 0}
+    missing_percent = {col: round(float(cnt) / len(df) * 100, 2) for col, cnt in missing.items() if cnt > 0} if len(df) > 0 else {}
 
     outlier_columns = []
     for col in df.select_dtypes(include=[np.number]).columns:
@@ -81,18 +85,27 @@ def analyze(file_path: str) -> dict:
             outlier_columns.append(col)
 
     class_imbalance = {}
-    for col in df.select_dtypes(include=['object', 'category', 'str']).columns:
+    for col in df.select_dtypes(include=['object', 'category', 'str', 'bool']).columns:
         if df[col].nunique() < MAX_UNIQUE_FOR_CATEGORICAL:
-            class_imbalance[col] = df[col].value_counts().to_dict()
+            counts = df[col].value_counts().to_dict()
+            class_imbalance[col] = {str(k): int(v) for k, v in counts.items()}
 
     dtypes = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+    has_actual_imbalance = False
+    if class_imbalance:
+        for counts in class_imbalance.values():
+            vals = list(counts.values())
+            if vals and (max(vals) / (sum(vals) + 1e-9) > IMBALANCE_THRESHOLD):
+                has_actual_imbalance = True
+                break
 
     data_processing = ["Dataset Loaded", "Schema Inferred"]
     if missing_values:
         data_processing.append("Missing Values Detected (Imputation Recommended)")
     if outlier_columns:
         data_processing.append("Outliers Flagged (Capping Recommended)")
-    if class_imbalance:
+    if has_actual_imbalance:
         data_processing.append("Class Imbalance Detected (Resampling Recommended)")
     data_processing.append("Analysis Complete")
 
@@ -127,5 +140,6 @@ if __name__ == '__main__':
         output = analyze(sys.argv[1])
         print(json.dumps(output))
     except Exception as e:
+        sys.stderr.write(f"{str(e)}\n")
         print(json.dumps({'error': str(e), 'filePath': sys.argv[1]}))
         sys.exit(1)

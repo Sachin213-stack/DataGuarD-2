@@ -1,9 +1,9 @@
 export const DATA_LOAD_PATTERNS = [
-    /pd\.read_csv\(['"](.+?)['"]\)/,
-    /pd\.read_parquet\(['"](.+?)['"]\)/,
-    /pl\.read_csv\(['"](.+?)['"]\)/,
-    /pl\.read_parquet\(['"](.+?)['"]\)/,
-    /pd\.read_json\(['"](.+?)['"]\)/,
+    /pd\.read_csv\(\s*(?:r|f)?['"](.+?)['"]/,
+    /pd\.read_parquet\(\s*(?:r|f)?['"](.+?)['"]/,
+    /pl\.read_csv\(\s*(?:r|f)?['"](.+?)['"]/,
+    /pl\.read_parquet\(\s*(?:r|f)?['"](.+?)['"]/,
+    /pd\.read_json\(\s*(?:r|f)?['"](.+?)['"]/,
 ] as const satisfies readonly RegExp[];
 
 export function findDataLoadMatch(text: string): RegExpMatchArray | null {

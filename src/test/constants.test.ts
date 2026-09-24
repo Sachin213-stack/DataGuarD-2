@@ -75,6 +75,18 @@ describe('findDataLoadMatch', () => {
         expect(match).not.toBeNull();
         expect(match![1]).toBe('../datasets/records.json');
     });
+
+    it('matches calls with extra keyword arguments', () => {
+        const match = findDataLoadMatch("df = pd.read_csv('data/train.csv', sep=';', index_col=0)");
+        expect(match).not.toBeNull();
+        expect(match![1]).toBe('data/train.csv');
+    });
+
+    it('matches calls with raw string prefix', () => {
+        const match = findDataLoadMatch("df = pd.read_csv(r'C:\\data\\train.csv', encoding='utf-8')");
+        expect(match).not.toBeNull();
+        expect(match![1]).toBe('C:\\data\\train.csv');
+    });
 });
 
 describe('testDataLoadPattern', () => {

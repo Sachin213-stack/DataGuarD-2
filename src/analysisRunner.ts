@@ -38,7 +38,18 @@ export class AnalysisRunner {
             proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
             proc.on('close', (code: number) => {
                 if (code !== 0) {
-                    reject(new Error(stderr || `Python exited with code ${code}`));
+                    let errorMessage = stderr.trim();
+                    if (!errorMessage && stdout.trim()) {
+                        try {
+                            const parsed = JSON.parse(stdout.trim());
+                            if (parsed && parsed.error) {
+                                errorMessage = parsed.error;
+                            }
+                        } catch {
+                            errorMessage = stdout.trim();
+                        }
+                    }
+                    reject(new Error(errorMessage || `Python exited with code ${code}`));
                     return;
                 }
                 try {

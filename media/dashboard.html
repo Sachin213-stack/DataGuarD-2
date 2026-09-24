@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.tailwindcss.com; img-src data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:;">
   <title>DataGuard Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -194,6 +194,16 @@
 (function() {
   const data = __ANALYSIS_DATA__;
 
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // File name
   const parts = (data.filePath || '').replace(/\\/g, '/').split('/');
   document.getElementById('file-name').textContent = parts[parts.length - 1] || data.filePath;
@@ -205,9 +215,11 @@
 
   // Health score
   const OUTLIER_PENALTY = __OUTLIER_PENALTY__;
-  const avgMissing = Object.keys(data.missingPercent || {}).length > 0
-    ? Object.values(data.missingPercent).reduce((a, b) => a + b, 0) / Object.keys(data.missingPercent).length
-    : 0;
+  const totalCols = (data.columns && data.columns.length > 0)
+    ? data.columns.length
+    : (data.shape && data.shape[1] > 0 ? data.shape[1] : 1);
+  const missingSum = Object.values(data.missingPercent || {}).reduce((a, b) => a + b, 0);
+  const avgMissing = missingSum / totalCols;
   const outlierPenalty = (data.outlierColumns || []).length * OUTLIER_PENALTY;
   const healthScore = Math.max(0, Math.min(100, Math.round(100 - avgMissing * 0.5 - outlierPenalty)));
 
@@ -227,7 +239,7 @@
   const badgesEl = document.getElementById('outlier-badges');
   if (data.outlierColumns && data.outlierColumns.length > 0) {
     badgesEl.innerHTML = data.outlierColumns.map(col =>
-      `<span class="badge-warn">${col}</span>`
+      `<span class="badge-warn">${escapeHtml(col)}</span>`
     ).join('');
   }
 
@@ -256,7 +268,10 @@
       }
     });
   } else {
-    document.getElementById('missing-chart').parentElement.innerHTML += '<p class="text-emerald-400 font-medium text-sm mt-2">✅ No missing values!</p>';
+    const msg = document.createElement('p');
+    msg.className = 'text-emerald-400 font-medium text-sm mt-2';
+    msg.textContent = '✅ No missing values!';
+    document.getElementById('missing-chart').parentElement.appendChild(msg);
   }
 
   // Data Types Donut Chart
@@ -267,7 +282,10 @@
     typeCounts[key] = (typeCounts[key] || 0) + 1;
   });
   const typeLabels = Object.keys(typeCounts);
-  const typePalette = ['#b58900', '#cb4b16', '#dc322f', '#d33682', '#6c71c4', '#268bd2', '#2aa198', '#859900'];
+  const typePalette = [
+    '#b58900', '#cb4b16', '#dc322f', '#d33682', '#6c71c4', '#268bd2', '#2aa198', '#859900',
+    '#38bdf8', '#fbbf24', '#f43f5e', '#a855f7', '#34d399', '#f97316', '#e879f9', '#64748b'
+  ];
   new Chart(document.getElementById('dtype-chart'), {
     type: 'doughnut',
     data: {
@@ -289,14 +307,30 @@
 
   // Class Imbalance
   const classImbEl = document.getElementById('class-imbalance-list');
-  if (data.classImbalance && Object.keys(data.classImbalance).length > 0) {
-    classImbEl.innerHTML = Object.entries(data.classImbalance).map(([col, counts]) => {
-      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const imbalancedItems = [];
+  if (data.classImbalance) {
+    Object.entries(data.classImbalance).forEach(([col, counts]) => {
+      const values = Object.values(counts || {});
+      if (!values.length) return;
+      const total = values.reduce((a, b) => a + b, 0);
+      if (total <= 0) return;
       const sortedClasses = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (!sortedClasses.length) return;
       const topClass = sortedClasses[0];
       const pct = ((topClass[1] / total) * 100).toFixed(1);
-      return `<div class="bg-gray-800 p-2 rounded"><span class="font-mono text-purple-300">${col}</span><br>Top: <span class="text-gray-100">${topClass[0]}</span> <span class="${pct > 80 ? 'text-red-400' : 'text-yellow-400'}">(${pct}%)</span></div>`;
-    }).join('');
+      if (pct > 80) {
+        imbalancedItems.push(`
+          <div class="bg-gray-800 p-2 rounded">
+            <span class="font-mono text-purple-300">${escapeHtml(col)}</span><br>
+            Top: <span class="text-gray-100">${escapeHtml(topClass[0])}</span>
+            <span class="text-red-400">(${pct}%)</span>
+          </div>
+        `);
+      }
+    });
+  }
+  if (imbalancedItems.length > 0) {
+    classImbEl.innerHTML = imbalancedItems.join('');
   } else {
     classImbEl.innerHTML = '<span class="text-green-400">✅ Balanced</span>';
   }
@@ -304,7 +338,7 @@
   // Data Processing
   const dataProcEl = document.getElementById('data-processing-list');
   if (data.dataProcessing && data.dataProcessing.length > 0) {
-    dataProcEl.innerHTML = data.dataProcessing.map(step => `<li>${step}</li>`).join('');
+    dataProcEl.innerHTML = data.dataProcessing.map(step => `<li>${escapeHtml(step)}</li>`).join('');
   } else {
     dataProcEl.innerHTML = '<span class="text-gray-500">No steps detected</span>';
   }
@@ -312,7 +346,7 @@
   // Analysis Techniques
   const techniquesEl = document.getElementById('analysis-techniques-list');
   if (data.analysisTechniques && data.analysisTechniques.length > 0) {
-    techniquesEl.innerHTML = data.analysisTechniques.map(tech => `<span class="bg-[#45475a] text-[#cdd6f4] px-2 py-1 rounded text-xs">${tech}</span>`).join('');
+    techniquesEl.innerHTML = data.analysisTechniques.map(tech => `<span class="bg-[#45475a] text-[#cdd6f4] px-2 py-1 rounded text-xs">${escapeHtml(tech)}</span>`).join('');
   } else {
     techniquesEl.innerHTML = '<span class="text-gray-500">None</span>';
   }
@@ -326,8 +360,8 @@
     const isOutlier = (data.outlierColumns || []).includes(col);
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td class="font-mono text-blue-300">${col}</td>
-      <td><span class="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded">${dtype}</span></td>
+      <td class="font-mono text-blue-300">${escapeHtml(col)}</td>
+      <td><span class="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded">${escapeHtml(dtype)}</span></td>
       <td>${missing > 0 ? `<span class="text-red-400">${missing}</span>` : '<span class="text-green-400">0</span>'}</td>
       <td>${missingPct != null ? `<span class="${missingPct > 20 ? 'text-red-400' : missingPct > 5 ? 'text-yellow-400' : 'text-green-400'}">${missingPct.toFixed(1)}%</span>` : '<span class="text-green-400">0%</span>'}</td>
       <td>${isOutlier ? '<span class="badge-warn">Yes</span>' : '<span class="badge-ok">No</span>'}</td>

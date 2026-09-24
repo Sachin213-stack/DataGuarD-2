@@ -34,8 +34,9 @@ export class DashboardPanel {
     private _update(result: AnalysisResult) {
         const htmlPath = path.join(this._extensionUri.fsPath, 'media', 'dashboard.html');
         let html = fs.readFileSync(htmlPath, 'utf8');
-        html = html.replace('__ANALYSIS_DATA__', JSON.stringify(result));
-        html = html.replace('__OUTLIER_PENALTY__', String(HEALTH_SCORE_OUTLIER_PENALTY));
+        const safeJson = JSON.stringify(result).replace(/</g, '\\u003c');
+        html = html.replace('__ANALYSIS_DATA__', () => safeJson);
+        html = html.replace('__OUTLIER_PENALTY__', () => String(HEALTH_SCORE_OUTLIER_PENALTY));
         this._panel.webview.html = html;
     }
 }

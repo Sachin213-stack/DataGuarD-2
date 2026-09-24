@@ -1,5 +1,7 @@
-"""Run the DataGuard analysis sidecar against all test datasets and display results."""
 import sys, os, json
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'sidecar'))
 from analyze import analyze
@@ -16,8 +18,9 @@ datasets = [
 OUTLIER_PENALTY = 5
 
 def health_score(result):
+    total_cols = len(result.get('columns', [])) or (result.get('shape', [0, 1])[1] or 1)
     mp = result.get('missingPercent', {})
-    avg_missing = sum(mp.values()) / len(mp) if mp else 0
+    avg_missing = sum(mp.values()) / total_cols
     outlier_penalty = len(result.get('outlierColumns', [])) * OUTLIER_PENALTY
     return max(0, min(100, round(100 - avg_missing * 0.5 - outlier_penalty)))
 
